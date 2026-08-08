@@ -43,3 +43,16 @@ export async function saveSupportState(kv: KVNamespace, chatId: number, state: S
 export async function clearSupportState(kv: KVNamespace, chatId: number) {
   await kv.delete(`support:${chatId}`);
 }
+
+// --- Dedup: Telegram retries webhook delivery if we don't respond fast enough,
+// which would otherwise cause the same post to be processed (and sent for
+// approval) multiple times. We mark each message as handled the moment we
+// see it, so retries are skipped instantly. ---
+export async function isAlreadyProcessed(kv: KVNamespace, dedupeKey: string): Promise<boolean> {
+  const existing = await kv.get(`processed:${dedupeKey}`);
+  return existing !== null;
+}
+
+export async function markProcessed(kv: KVNamespace, dedupeKey: string) {
+  await kv.put(`processed:${dedupeKey}`, "1", { expirationTtl: 60 * 60 * 24 });
+}
