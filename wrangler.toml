@@ -19,8 +19,8 @@ kv_namespaces = [
 [vars]
 # Non-secret config — safe to keep in this file and edit directly.
 OWNER_CHAT_ID = "172536779"
-MIDDLEMAN_CHAT_ID = "REPLACE_WITH_MIDDLEMAN_CHANNEL_ID"   # where you forward supplier posts to
-TARGET_CHANNEL_ID = "REPLACE_WITH_YOUR_PUBLIC_CHANNEL_ID"  # where approved posts get published
+MIDDLEMAN_CHAT_ID = "-1004342020747"   # where you forward supplier posts to
+TARGET_CHANNEL_ID = "-1001154080652"  # where approved posts get published
 OWNER_PHONE = "02128428489"
 OWNER_TELEGRAM_USERNAME = "supshop1"
 AUTO_PUBLISH = "false"   # set to "true" once you trust the bot and want to skip manual approval
