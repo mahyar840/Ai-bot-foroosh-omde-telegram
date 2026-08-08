@@ -28,6 +28,25 @@ export interface Env {
   GROQ_TEXT_MODEL: string;
 }
 
+/** Combines the AI-cleaned product description with our price and contact info, reliably in code. */
+function buildFinalCaption(
+  cleanedDescription: string,
+  salePriceFormatted: string,
+  ownerPhone: string,
+  ownerUsername: string
+): string {
+  return (
+    `${cleanedDescription.trim()}\n\n` +
+    `💰 قیمت: ${salePriceFormatted}\n\n` +
+    `📞 ${ownerPhone}\n` +
+    `🆔 @${ownerUsername}`
+  );
+}
+
+function isLogoConfigured(logoUrl: string): boolean {
+  return Boolean(logoUrl) && !logoUrl.startsWith("REPLACE_WITH");
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const bot = new Bot(env.BOT_TOKEN);
@@ -65,26 +84,31 @@ export default {
 
       const salePrice = calculateSalePrice(purchasePrice, DEFAULT_TIERS);
       const salePriceFormatted = formatToman(salePrice);
-      const newCaption = await rewriteCaption(caption, salePriceFormatted, env.GROQ_API_KEY, env.GROQ_TEXT_MODEL);
+      const cleanedDescription = await rewriteCaption(caption, env.GROQ_API_KEY, env.GROQ_TEXT_MODEL);
+      const newCaption = buildFinalCaption(cleanedDescription, salePriceFormatted, env.OWNER_PHONE, env.OWNER_TELEGRAM_USERNAME);
 
-      // Download the photo bytes, stamp the logo, re-upload
+      // Download the photo bytes, and stamp the logo IF one is configured.
       const imgRes = await fetch(fileUrl);
       const imgBytes = new Uint8Array(await imgRes.arrayBuffer());
-      const logoRes = await fetch(env.LOGO_URL);
-      const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
-      const stampedBytes = await overlayLogo(imgBytes, { logoBytes, position: "bottom-right" });
+
+      let finalImageBytes = imgBytes;
+      if (isLogoConfigured(env.LOGO_URL)) {
+        const logoRes = await fetch(env.LOGO_URL);
+        const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
+        finalImageBytes = await overlayLogo(imgBytes, { logoBytes, position: "bottom-right" });
+      }
 
       const postId = crypto.randomUUID();
 
       if (env.AUTO_PUBLISH === "true") {
-        await ctx.api.sendPhoto(env.TARGET_CHANNEL_ID, new File([stampedBytes], "post.jpg"), {
+        await ctx.api.sendPhoto(env.TARGET_CHANNEL_ID, new File([finalImageBytes], "post.jpg"), {
           caption: newCaption,
         });
         return;
       }
 
       // Send to owner for approval
-      const sentMsg = await ctx.api.sendPhoto(env.OWNER_CHAT_ID, new File([stampedBytes], "post.jpg"), {
+      const sentMsg = await ctx.api.sendPhoto(env.OWNER_CHAT_ID, new File([finalImageBytes], "post.jpg"), {
         caption: `${newCaption}\n\n— برای تایید و انتشار در کانال، دکمه زیر رو بزن —`,
         reply_markup: new InlineKeyboard()
           .text("✅ تایید و انتشار", `approve:${postId}`)
