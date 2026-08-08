@@ -20,9 +20,17 @@ export async function checkImageForCompetitorMarks(
   visionModel: string
 ): Promise<WatermarkCheckResult> {
   const prompt =
-    "این تصویر یک آگهی محصول است. با دقت بررسی کن که آیا روی تصویر واترمارک، " +
-    "لوگو، نام برند، آیدی تلگرام یا شماره تماس شخص/کسب‌وکار دیگری (غیر از خود محصول) دیده می‌شود یا نه. " +
-    "فقط یک JSON خام با این ساختار برگردان و هیچ متن اضافه‌ای ننویس: " +
+    "این تصویر یک عکس محصول است که قراره تو یه کانال فروش دیگه بازنشر بشه. " +
+    "فقط دنبال یک چیز خیلی مشخص بگرد: آیا یک نفر یا یک فروشگاه (غیر از سازنده‌ی اصلی محصول)، " +
+    "روی خودِ عکس یک واترمارک/لوگو/آیدی تلگرام/شماره تماس/آدرس کانال اضافه کرده که مشخصه بعداً " +
+    "با فتوشاپ یا اپلیکیشن روی عکس گذاشته شده (مثلاً معمولاً نیمه‌شفاف، گوشه‌ی عکس، یا به‌صورت مورب روی کل عکس)؟\n\n" +
+    "این‌ها را اصلاً نباید مشکل در نظر بگیری و باید has_competitor_mark را false بذاری:\n" +
+    "- نوشته‌ها و برند خودِ سازنده‌ی محصول که روی جعبه/بسته‌بندی/بدنه‌ی اصلی محصول چاپ شده (مثلاً Samsung, Apple و امثالش روی خود کالا)\n" +
+    "- پس‌زمینه‌ی عکس، میز، دست، یا هر چیز دیگه‌ای که ربطی به تبلیغ نداره\n" +
+    "- اگر مطمئن نیستی یا فقط شک داری و نشونه‌ی واضحی نمی‌بینی\n\n" +
+    "فقط زمانی has_competitor_mark را true بذار که کاملاً مطمئن باشی یک نشان تبلیغاتی روی عکس اضافه شده. " +
+    "در حالت شک، همیشه false بذار.\n\n" +
+    "فقط یک JSON خام با این ساختار برگردان، هیچ متن اضافه‌ای ننویس: " +
     '{"has_competitor_mark": true یا false, "reason": "توضیح خیلی کوتاه"}';
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -63,24 +71,34 @@ export async function checkImageForCompetitorMarks(
       reason: parsed.reason ?? "",
     };
   } catch {
-    // If the model didn't return valid JSON, err on the side of caution
-    // and send it to manual review instead of silently publishing it.
-    return { isClean: false, reason: "پاسخ هوش‌مصنوعی قابل‌تفسیر نبود — نیاز به بررسی دستی" };
+    // If the model didn't return valid JSON, don't reject — bias toward
+    // publishing over false rejections. The owner still sees every post
+    // before it goes live in phase 1, so a rare bad one gets caught there.
+    return { isClean: true, reason: "پاسخ هوش‌مصنوعی قابل‌تفسیر نبود، به‌صورت پیش‌فرض تمیز در نظر گرفته شد" };
   }
 }
 
+/**
+ * Rewrites a supplier caption down to just the product description — no price,
+ * no contact info, no links. The price line and our own contact footer are
+ * added afterward in code (see buildFinalCaption in index.ts) so they're
+ * never accidentally dropped or mangled by the model.
+ */
 export async function rewriteCaption(
   originalCaption: string,
-  salePriceFormatted: string,
   groqApiKey: string,
   textModel: string
 ): Promise<string> {
   const prompt =
-    "متن زیر یک کپشن محصول از یک تامین‌کننده است. این کپشن را بازنویسی کن: " +
-    "لحن را حرفه‌ای و جذاب برای کانال فروش کن، مشخصات فنی محصول را نگه دار، " +
-    "قیمت تامین‌کننده را حذف کن و به‌جایش این قیمت را دقیقاً همین‌طور بگذار: " +
-    `"${salePriceFormatted}". هیچ نام یا شماره تماس تامین‌کننده را در متن نگه ندار. ` +
-    "فقط متن نهایی کپشن را برگردان، بدون توضیح اضافه.\n\n" +
+    "متن زیر یک کپشن محصول از یک تامین‌کننده/فروشنده عمده است. فقط توضیح و مشخصات فنی خودِ محصول " +
+    "(اسم محصول، برند، مدل، ویژگی‌ها، کیفیت) را نگه دار و اینها را کامل حذف کن:\n" +
+    "- هر عدد یا خطی که قیمت است\n" +
+    "- هر شماره تلفن یا واتساپ\n" +
+    "- هر آیدی یا یوزرنیم تلگرام/اینستاگرام (هرچی با @ یا t.me یا instagram.com شروع می‌شه)\n" +
+    "- هر لینک یا آدرس کانال/گروه/سایت (t.me/..., rubika.ir/..., هر لینک دیگه)\n" +
+    "- اسم فروشگاه یا تامین‌کننده و هر جمله‌ی تبلیغاتی درباره خودشون (مثلاً «کانال همکاران ما»، «سفارش از...»)\n\n" +
+    "لحن را برای یک کانال فروش حرفه‌ای و جذاب کن ولی مشخصات فنی واقعی محصول را عوض نکن یا اضافه نکن. " +
+    "فقط متن نهایی (بدون قیمت و بدون اطلاعات تماس) را برگردان، بدون هیچ توضیح اضافه‌ای.\n\n" +
     `کپشن اصلی:\n${originalCaption}`;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
