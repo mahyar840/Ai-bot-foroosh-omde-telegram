@@ -18,7 +18,7 @@ kv_namespaces = [
 
 [vars]
 # Non-secret config — safe to keep in this file and edit directly.
-OWNER_CHAT_ID = "8856987612"
+OWNER_CHAT_ID = "172536779"
 MIDDLEMAN_CHAT_ID = "REPLACE_WITH_MIDDLEMAN_CHANNEL_ID"   # where you forward supplier posts to
 TARGET_CHANNEL_ID = "REPLACE_WITH_YOUR_PUBLIC_CHANNEL_ID"  # where approved posts get published
 OWNER_PHONE = "02128428489"
