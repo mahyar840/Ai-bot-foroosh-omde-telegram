@@ -1,0 +1,31 @@
+name = "karmand-resale-bot"
+main = "src/index.ts"
+compatibility_date = "2024-09-25"
+compatibility_flags = ["nodejs_compat"]
+
+# --- KV namespace: stores pending posts waiting for your approval,
+# a simple support-conversation state per customer, and settings (price tiers).
+# Create it with:  wrangler kv namespace create BOT_KV
+# then paste the id below.
+kv_namespaces = [
+  { binding = "BOT_KV", id = "REPLACE_WITH_YOUR_KV_ID" }
+]
+
+# --- Secrets (do NOT put real values here — set them with `wrangler secret put NAME`):
+# BOT_TOKEN            -> your Telegram bot token from @BotFather
+# GROQ_API_KEY         -> your Groq API key
+# WEBHOOK_SECRET       -> any random string you invent, used to verify Telegram's requests
+
+[vars]
+# Non-secret config — safe to keep in this file and edit directly.
+OWNER_CHAT_ID = "REPLACE_WITH_YOUR_TELEGRAM_USER_ID"
+MIDDLEMAN_CHAT_ID = "REPLACE_WITH_MIDDLEMAN_CHANNEL_ID"   # where you forward supplier posts to
+TARGET_CHANNEL_ID = "REPLACE_WITH_YOUR_PUBLIC_CHANNEL_ID"  # where approved posts get published
+OWNER_PHONE = "0912xxxxxxx"
+OWNER_TELEGRAM_USERNAME = "your_username"
+AUTO_PUBLISH = "false"   # set to "true" once you trust the bot and want to skip manual approval
+LOGO_URL = "REPLACE_WITH_DIRECT_LINK_TO_YOUR_LOGO_PNG"
+# Current as of Aug 2026 — Groq retires/renames models periodically.
+# If a call starts failing, check https://console.groq.com/docs/models and update these.
+GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
+GROQ_VISION_MODEL = "qwen/qwen3.6-27b"

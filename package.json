@@ -1,0 +1,19 @@
+{
+  "name": "karmand-resale-bot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "grammy": "^1.24.0",
+    "@cf-wasm/photon": "^0.1.22"
+  },
+  "devDependencies": {
+    "wrangler": "^3.78.0",
+    "typescript": "^5.5.4",
+    "@cloudflare/workers-types": "^4.20240925.0"
+  }
+}
