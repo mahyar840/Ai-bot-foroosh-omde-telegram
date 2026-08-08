@@ -1,4 +1,4 @@
-import { Bot, webhookCallback, InlineKeyboard } from "grammy";
+import { Bot, webhookCallback, InlineKeyboard, InputFile } from "grammy";
 import { extractPriceFromCaption, calculateSalePrice, formatToman, DEFAULT_TIERS } from "./pricing";
 import { checkImageForCompetitorMarks, rewriteCaption, summarizeSupportRequest } from "./vision";
 import { overlayLogo } from "./image";
@@ -101,14 +101,14 @@ export default {
       const postId = crypto.randomUUID();
 
       if (env.AUTO_PUBLISH === "true") {
-        await ctx.api.sendPhoto(env.TARGET_CHANNEL_ID, new File([finalImageBytes], "post.jpg"), {
+        await ctx.api.sendPhoto(env.TARGET_CHANNEL_ID, new InputFile(finalImageBytes, "post.jpg"), {
           caption: newCaption,
         });
         return;
       }
 
       // Send to owner for approval
-      const sentMsg = await ctx.api.sendPhoto(env.OWNER_CHAT_ID, new File([finalImageBytes], "post.jpg"), {
+      const sentMsg = await ctx.api.sendPhoto(env.OWNER_CHAT_ID, new InputFile(finalImageBytes, "post.jpg"), {
         caption: `${newCaption}\n\n— برای تایید و انتشار در کانال، دکمه زیر رو بزن —`,
         reply_markup: new InlineKeyboard()
           .text("✅ تایید و انتشار", `approve:${postId}`)
