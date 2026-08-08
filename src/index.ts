@@ -9,6 +9,8 @@ import {
   getSupportState,
   saveSupportState,
   clearSupportState,
+  isAlreadyProcessed,
+  markProcessed,
 } from "./storage";
 import { buildCustomerReplyWithContact, buildOwnerBrief, nextSupportStep } from "./support";
 
@@ -55,6 +57,13 @@ export default {
     bot.on("channel_post:photo", async (ctx) => {
       if (String(ctx.chat.id) !== env.MIDDLEMAN_CHAT_ID) return; // ignore other channels
 
+      // Telegram may redeliver the same update if we don't respond fast enough
+      // (e.g. while waiting on a slow/rate-limited Groq call). Skip anything
+      // we've already started handling.
+      const dedupeKey = `${ctx.chat.id}:${ctx.channelPost.message_id}`;
+      if (await isAlreadyProcessed(env.BOT_KV, dedupeKey)) return;
+      await markProcessed(env.BOT_KV, dedupeKey);
+
       const caption = ctx.channelPost.caption ?? "";
       const purchasePrice = extractPriceFromCaption(caption);
 
@@ -73,7 +82,16 @@ export default {
       const fileUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${file.file_path}`;
 
       // Watermark / competitor-mark check
-      const check = await checkImageForCompetitorMarks(fileUrl, env.GROQ_API_KEY, env.GROQ_VISION_MODEL);
+      let check;
+      try {
+        check = await checkImageForCompetitorMarks(fileUrl, env.GROQ_API_KEY, env.GROQ_VISION_MODEL);
+      } catch (err) {
+        await ctx.api.sendMessage(
+          env.OWNER_CHAT_ID,
+          `⚠️ خطا در بررسی تصویر با هوش‌مصنوعی (احتمالاً محدودیت نرخ Groq — چند دقیقه صبر کن و دوباره امتحان کن):\n${(err as Error).message}\n\nاین پست نیاز به بررسی دستی داره:\n${caption}`
+        );
+        return;
+      }
       if (!check.isClean) {
         await ctx.api.sendMessage(
           env.OWNER_CHAT_ID,
@@ -84,7 +102,16 @@ export default {
 
       const salePrice = calculateSalePrice(purchasePrice, DEFAULT_TIERS);
       const salePriceFormatted = formatToman(salePrice);
-      const cleanedDescription = await rewriteCaption(caption, env.GROQ_API_KEY, env.GROQ_TEXT_MODEL);
+      let cleanedDescription: string;
+      try {
+        cleanedDescription = await rewriteCaption(caption, env.GROQ_API_KEY, env.GROQ_TEXT_MODEL);
+      } catch (err) {
+        await ctx.api.sendMessage(
+          env.OWNER_CHAT_ID,
+          `⚠️ خطا در بازنویسی کپشن با هوش‌مصنوعی (احتمالاً محدودیت نرخ Groq):\n${(err as Error).message}\n\nاین پست نیاز به بررسی دستی داره:\n${caption}`
+        );
+        return;
+      }
       const newCaption = buildFinalCaption(cleanedDescription, salePriceFormatted, env.OWNER_PHONE, env.OWNER_TELEGRAM_USERNAME);
 
       // Download the photo bytes, and stamp the logo IF one is configured.
