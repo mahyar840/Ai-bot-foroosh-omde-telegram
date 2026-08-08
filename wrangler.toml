@@ -18,11 +18,11 @@ kv_namespaces = [
 
 [vars]
 # Non-secret config — safe to keep in this file and edit directly.
-OWNER_CHAT_ID = "REPLACE_WITH_YOUR_TELEGRAM_USER_ID"
+OWNER_CHAT_ID = "8856987612"
 MIDDLEMAN_CHAT_ID = "REPLACE_WITH_MIDDLEMAN_CHANNEL_ID"   # where you forward supplier posts to
 TARGET_CHANNEL_ID = "REPLACE_WITH_YOUR_PUBLIC_CHANNEL_ID"  # where approved posts get published
-OWNER_PHONE = "0912xxxxxxx"
-OWNER_TELEGRAM_USERNAME = "your_username"
+OWNER_PHONE = "02128428489"
+OWNER_TELEGRAM_USERNAME = "supshop1"
 AUTO_PUBLISH = "false"   # set to "true" once you trust the bot and want to skip manual approval
 LOGO_URL = "REPLACE_WITH_DIRECT_LINK_TO_YOUR_LOGO_PNG"
 # Current as of Aug 2026 — Groq retires/renames models periodically.
