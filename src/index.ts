@@ -161,6 +161,7 @@ function registerHandlers(bot: Bot, env: Env) {
     if (!prevState) {
       await ctx.reply("اگه فقط دنبال شماره پشتیبانی هستی:", { reply_markup: directContactKeyboard() });
       await ctx.reply(withState(buildIntro(env.SUPPORT_INTRO), { step: "awaiting_name" }), {
+        parse_mode: "HTML",
         reply_markup: { force_reply: true },
       });
       return;
@@ -172,7 +173,7 @@ function registerHandlers(bot: Bot, env: Env) {
           step: "awaiting_phone",
           name: ctx.message.text,
         }),
-        { reply_markup: { force_reply: true } }
+        { parse_mode: "HTML", reply_markup: { force_reply: true } }
       );
       return;
     }
@@ -184,7 +185,7 @@ function registerHandlers(bot: Bot, env: Env) {
           name: prevState.name,
           phone: ctx.message.text,
         }),
-        { reply_markup: { force_reply: true } }
+        { parse_mode: "HTML", reply_markup: { force_reply: true } }
       );
       return;
     }
@@ -197,7 +198,7 @@ function registerHandlers(bot: Bot, env: Env) {
           phone: prevState.phone,
           city: ctx.message.text,
         }),
-        { reply_markup: { force_reply: true } }
+        { parse_mode: "HTML", reply_markup: { force_reply: true } }
       );
       return;
     }
@@ -234,6 +235,7 @@ function registerHandlers(bot: Bot, env: Env) {
     if (ctx.chat.type !== "private") return;
     await ctx.reply("اگه فقط دنبال شماره پشتیبانی هستی:", { reply_markup: directContactKeyboard() });
     await ctx.reply(withState(buildIntro(env.SUPPORT_INTRO), { step: "awaiting_name" }), {
+      parse_mode: "HTML",
       reply_markup: { force_reply: true },
     });
   });
