@@ -3,13 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2024-09-25"
 compatibility_flags = ["nodejs_compat"]
 
-# --- KV namespace: stores pending posts waiting for your approval,
-# a simple support-conversation state per customer, and settings (price tiers).
-# Create it with:  wrangler kv namespace create BOT_KV
-# then paste the id below.
-kv_namespaces = [
-  { binding = "BOT_KV", id = "7d2e5dcb382b43f99d1256a3f74a507a" }
-]
+
 
 # --- Secrets (do NOT put real values here — set them with `wrangler secret put NAME`):
 # BOT_TOKEN            -> your Telegram bot token from @BotFather
@@ -29,3 +23,4 @@ LOGO_URL = "REPLACE_WITH_DIRECT_LINK_TO_YOUR_LOGO_PNG"
 # If a call starts failing, check https://console.groq.com/docs/models and update these.
 GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
 GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
+SUPPORT_INTRO = "REPLACE_WITH_YOUR_OWN_GREETING_OR_LEAVE_AS_IS"
