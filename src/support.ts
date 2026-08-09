@@ -4,10 +4,8 @@
 // customer's phone number to you (the human) so you can call them.
 //
 // No storage needed: each bot question carries the conversation state hidden
-// inside INVISIBLE unicode characters (zero-width spaces) appended to the
-// message text — completely invisible, nothing to tap or notice. When the
-// customer replies (Force Reply), we read that hidden state straight out of
-// the message they replied to.
+// in a small tap-to-reveal "spoiler" block. When the customer replies (Force
+// Reply), we read that hidden state straight out of the message they replied to.
 // ---------------------------------------------------------------------------
 
 export interface SupportState {
@@ -17,39 +15,32 @@ export interface SupportState {
   city?: string;
 }
 
-const ZERO = "\u200B"; // zero-width space
-const ONE = "\u200C"; // zero-width non-joiner
-const MARK = "\u200D"; // zero-width joiner, used as a start/end marker
-
-function textToBits(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let bits = "";
-  for (const b of bytes) bits += b.toString(2).padStart(8, "0");
-  return bits;
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function bitsToText(bits: string): string {
-  const bytes: number[] = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) {
-    bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  }
-  return new TextDecoder().decode(new Uint8Array(bytes));
+function unescapeHtml(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
 
-/** Appends a completely invisible state marker to a message (no visible artifact at all). */
+/**
+ * Appends a small hidden (tap-to-reveal "spoiler") state marker to a message.
+ * Send with parse_mode: "HTML". Note: truly-invisible zero-width characters
+ * don't work here — Telegram strips them from message text, which breaks the
+ * whole mechanism — so a tappable spoiler block is the reliable option.
+ */
 export function withState(visibleText: string, state: SupportState): string {
-  const bits = textToBits(JSON.stringify(state));
-  const invisible = [...bits].map((b) => (b === "0" ? ZERO : ONE)).join("");
-  return `${visibleText}${MARK}${invisible}${MARK}`;
+  const json = escapeHtml(JSON.stringify(state));
+  return `${visibleText}\n\n<tg-spoiler>#${json}</tg-spoiler>`;
 }
 
-/** Reads the invisible state marker back out of the bot's own previous message. */
+/** Reads the state marker back out of the bot's own previous message (the one the customer replied to). */
 export function extractState(previousMessageText: string | undefined): SupportState | null {
   if (!previousMessageText) return null;
-  const match = previousMessageText.match(new RegExp(`${MARK}([${ZERO}${ONE}]+)${MARK}`));
+  const match = previousMessageText.match(/#(\{[\s\S]*\})/);
   if (!match) return null;
   try {
-    return JSON.parse(bitsToText(match[1]));
+    return JSON.parse(unescapeHtml(match[1]));
   } catch {
     return null;
   }
