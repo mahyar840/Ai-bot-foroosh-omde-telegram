@@ -1,11 +1,12 @@
 // ---------------------------------------------------------------------------
-// Customer-facing support flow: answers simply, collects name/phone/city/product,
-// gives the customer your contact info, and sends a short brief + the
-// customer's phone number to you (the human) so you can call them.
+// Customer-facing support flow: warm, professional wholesale-buyer script.
+// Collects name/phone/city-business/product, gives contact info, and sends
+// a brief to you (the human) with the customer's phone number so you can call.
 //
 // No storage needed: each bot question carries the conversation state hidden
-// in a small tap-to-reveal "spoiler" block. When the customer replies (Force
-// Reply), we read that hidden state straight out of the message they replied to.
+// in a small tap-to-reveal "spoiler" block (kept as short as possible). When
+// the customer replies (Force Reply), we read that hidden state straight out
+// of the message they replied to.
 // ---------------------------------------------------------------------------
 
 export interface SupportState {
@@ -23,47 +24,66 @@ function unescapeHtml(s: string): string {
   return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
 
-/**
- * Appends a small hidden (tap-to-reveal "spoiler") state marker to a message.
- * Send with parse_mode: "HTML". Note: truly-invisible zero-width characters
- * don't work here — Telegram strips them from message text, which breaks the
- * whole mechanism — so a tappable spoiler block is the reliable option.
- */
+function packState(state: SupportState): string {
+  const packed: Record<string, string> = { s: state.step };
+  if (state.name) packed.n = state.name;
+  if (state.phone) packed.p = state.phone;
+  if (state.city) packed.c = state.city;
+  return JSON.stringify(packed);
+}
+
+function unpackState(json: string): SupportState | null {
+  const p = JSON.parse(json);
+  if (!p.s) return null;
+  return { step: p.s, name: p.n, phone: p.p, city: p.c };
+}
+
 export function withState(visibleText: string, state: SupportState): string {
-  const json = escapeHtml(JSON.stringify(state));
+  const json = escapeHtml(packState(state));
   return `${visibleText}\n\n<tg-spoiler>#${json}</tg-spoiler>`;
 }
 
-/** Reads the state marker back out of the bot's own previous message (the one the customer replied to). */
 export function extractState(previousMessageText: string | undefined): SupportState | null {
   if (!previousMessageText) return null;
   const match = previousMessageText.match(/#(\{[\s\S]*\})/);
   if (!match) return null;
   try {
-    return JSON.parse(unescapeHtml(match[1]));
+    return unpackState(unescapeHtml(match[1]));
   } catch {
     return null;
   }
 }
 
 const DEFAULT_INTRO =
-  "سلام رفیق 👋 خوشحالم که پیام دادی! چند تا سوال کوچیک می‌پرسم تا سریع‌تر کمکت کنم.";
+  "سلام وقت بخیر 🌱\nحتماً کمکتون می‌کنم! برای اینکه همکار فروش بتونه دقیق‌تر راهنماییتون کنه، چند تا سوال کوتاه می‌پرسم.\n\nاول از همه، لطفاً اسم و فامیلتون رو بفرستین.";
 
 export function buildIntro(customIntro: string): string {
-  const intro = customIntro && !customIntro.startsWith("REPLACE_WITH") ? customIntro : DEFAULT_INTRO;
-  return `${intro}\n\nاول بگو، اسمت چیه؟`;
+  return customIntro && !customIntro.startsWith("REPLACE_WITH") ? customIntro : DEFAULT_INTRO;
+}
+
+export function buildAskPhone(name: string): string {
+  return `ممنون ${name} جان، از آشناییتون خوشحال شدم 🙏\nبرای اینکه اگر نیاز به هماهنگی یا استعلام قیمت داشتیم راحت‌تر باهاتون در ارتباط باشیم، لطفاً شماره تماستون رو هم بفرستین.`;
+}
+
+export function buildAskCity(): string {
+  return `ممنونم 🙏\nحالا برای اینکه پیشنهاد و شرایط فروش رو متناسب با بازار خودتون بررسی کنیم، بگید از کدوم شهر و در چه حوزه‌ای فعالیت می‌کنید؟\nمثلاً فروشگاه موبایل، لوازم جانبی، پخش، فروش آنلاین و...`;
+}
+
+export function buildAskProduct(): string {
+  return `عالیه 👌\nحالا بگید دقیقاً دنبال چه محصولی هستید و حدوداً چه تعدادی نیاز دارید؟\nاگر مدل یا مشخصات خاصی هم مدنظرتونه، همون رو بفرستین تا همکار فروش بر اساس همون بررسی کنه.`;
 }
 
 export function buildDirectContactMessage(ownerPhone: string, ownerUsername: string): string {
-  return `📞 ${ownerPhone}\n🆔 @${ownerUsername}\n\nهر وقت خواستی می‌تونی مستقیم تماس بگیری یا پیام بدی 🙌`;
+  return `📞 ${ownerPhone}\n🆔 @${ownerUsername}\n\nهر وقت خواستید می‌تونید مستقیم تماس بگیرید یا پیام بدید 🙌`;
 }
 
-export function buildCustomerReplyWithContact(ownerPhone: string, ownerUsername: string): string {
+export function buildCustomerFinalReply(name: string, product: string, ownerPhone: string, ownerUsername: string): string {
   return (
-    `ممنون از پیامت 🙏\n` +
-    `تیم پشتیبانی به‌زودی باهات تماس می‌گیره. برای ارتباط سریع‌تر:\n` +
-    `📞 ${ownerPhone}\n` +
-    `🆔 @${ownerUsername}`
+    `حتماً ${name} جان، متوجه شدم 👌\n${product}\n\n` +
+    `این تعداد وارد محدوده خرید عمده می‌شه، بهتره قیمت، موجودی و شرایط تأمین رو دقیق براتون بررسی کنیم تا صرفاً یک قیمت عمومی اعلام نشه.\n\n` +
+    `اطلاعاتتون ثبت شد و همکار فروش عمده باهاتون تماس می‌گیره و قیمت، موجودی و شرایط خرید رو هماهنگ می‌کنه.\n\n` +
+    `اگر هم خواستید مستقیم با بخش فروش عمده در ارتباط باشید:\n📞 ${ownerPhone}\n🆔 @${ownerUsername}\n\n` +
+    `ممنون که ما رو برای خرید و تأمین کالای فروشگاهتون انتخاب کردید 🙏`
   );
 }
 
