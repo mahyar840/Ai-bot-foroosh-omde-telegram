@@ -2,10 +2,44 @@
 // Customer-facing support flow: answers simply, collects name/city/product,
 // gives the customer your contact info, and sends a short brief + the
 // customer's Telegram contact info to you (the human) so you can follow up.
-// This mirrors the example you gave:
-//   "رضا موسوی، فروشنده موبایل از ساری، می‌خواد 25 وات بخره در تعداد بالا..."
+//
+// No storage needed: each bot question is sent with Force Reply, and carries
+// a small hidden state marker (visible only as a tappable "spoiler" block in
+// Telegram). When the customer replies, we read that marker straight out of
+// the message they replied to, so the whole conversation is stateless.
 // ---------------------------------------------------------------------------
-import type { SupportState } from "./storage";
+
+export interface SupportState {
+  step: "awaiting_name" | "awaiting_city" | "awaiting_product";
+  name?: string;
+  city?: string;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function unescapeHtml(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+}
+
+/** Appends a hidden (spoiler-tap-to-reveal) state marker to a message. Send with parse_mode: "HTML". */
+export function withState(visibleText: string, state: SupportState): string {
+  const json = escapeHtml(JSON.stringify(state));
+  return `${visibleText}\n\n<tg-spoiler>#${json}</tg-spoiler>`;
+}
+
+/** Reads the state marker back out of the bot's own previous message (the one the customer replied to). */
+export function extractState(previousMessageText: string | undefined): SupportState | null {
+  if (!previousMessageText) return null;
+  const match = previousMessageText.match(/#(\{[\s\S]*\})/);
+  if (!match) return null;
+  try {
+    return JSON.parse(unescapeHtml(match[1]));
+  } catch {
+    return null;
+  }
+}
 
 export function buildCustomerReplyWithContact(ownerPhone: string, ownerUsername: string): string {
   return (
@@ -34,31 +68,4 @@ export function buildOwnerBrief(params: {
   lines.push(`آیدی عددی: ${params.customerTelegramId}`);
   if (params.customerTelegramUsername) lines.push(`یوزرنیم: @${params.customerTelegramUsername}`);
   return lines.join("\n");
-}
-
-/** Very small state machine — advances the conversation by one step per message. */
-export function nextSupportStep(state: SupportState, incomingText: string): { state: SupportState; botReply?: string } {
-  switch (state.step) {
-    case "idle":
-      return {
-        state: { ...state, step: "awaiting_name" },
-        botReply: "سلام! برای اینکه سریع‌تر راهنماییت کنم، اسمت چیه؟",
-      };
-    case "awaiting_name":
-      return {
-        state: { ...state, name: incomingText, step: "awaiting_city" },
-        botReply: "خوشبختم 🙌 از کدوم شهر هستی و چیکاره‌ای (مثلاً فروشنده موبایل)؟",
-      };
-    case "awaiting_city":
-      return {
-        state: { ...state, city: incomingText, step: "awaiting_product" },
-        botReply: "عالی، حالا بگو دنبال چه محصولی هستی و با چه تعدادی؟",
-      };
-    case "awaiting_product":
-      return {
-        state: { ...state, product: incomingText, step: "done" },
-      };
-    default:
-      return { state };
-  }
 }
