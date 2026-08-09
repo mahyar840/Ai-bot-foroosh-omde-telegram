@@ -2,7 +2,14 @@ import { Bot, InlineKeyboard, InputFile } from "grammy";
 import { extractPriceFromCaption, calculateSalePrice, formatToman, DEFAULT_TIERS } from "./pricing";
 import { checkImageForCompetitorMarks, rewriteCaption, summarizeSupportRequest } from "./vision";
 import { overlayLogo } from "./image";
-import { buildCustomerReplyWithContact, buildOwnerBrief, withState, extractState } from "./support";
+import {
+  buildCustomerReplyWithContact,
+  buildDirectContactMessage,
+  buildIntro,
+  buildOwnerBrief,
+  withState,
+  extractState,
+} from "./support";
 
 export interface Env {
   BOT_TOKEN: string;
@@ -17,6 +24,7 @@ export interface Env {
   LOGO_URL: string;
   GROQ_VISION_MODEL: string;
   GROQ_TEXT_MODEL: string;
+  SUPPORT_INTRO: string;
 }
 
 function buildFinalCaption(
@@ -35,6 +43,10 @@ function buildFinalCaption(
 
 function isLogoConfigured(logoUrl: string): boolean {
   return Boolean(logoUrl) && !logoUrl.startsWith("REPLACE_WITH");
+}
+
+function directContactKeyboard(): InlineKeyboard {
+  return new InlineKeyboard().text("☎️ تماس مستقیم با پشتیبان", "direct_contact");
 }
 
 function registerHandlers(bot: Bot, env: Env) {
@@ -114,6 +126,13 @@ function registerHandlers(bot: Bot, env: Env) {
 
   bot.on("callback_query:data", async (ctx) => {
     const action = ctx.callbackQuery.data;
+
+    if (action === "direct_contact") {
+      await ctx.answerCallbackQuery();
+      await ctx.reply(buildDirectContactMessage(env.OWNER_PHONE, env.OWNER_TELEGRAM_USERNAME));
+      return;
+    }
+
     if (action !== "approve" && action !== "reject") return;
 
     const msg = ctx.callbackQuery.message;
@@ -140,8 +159,8 @@ function registerHandlers(bot: Bot, env: Env) {
     const prevState = extractState(ctx.message.reply_to_message?.text);
 
     if (!prevState) {
-      await ctx.reply(withState("سلام! برای اینکه سریع‌تر کمکت کنم، اسمت چیه؟", { step: "awaiting_name" }), {
-        parse_mode: "HTML",
+      await ctx.reply("اگه فقط دنبال شماره پشتیبانی هستی:", { reply_markup: directContactKeyboard() });
+      await ctx.reply(withState(buildIntro(env.SUPPORT_INTRO), { step: "awaiting_name" }), {
         reply_markup: { force_reply: true },
       });
       return;
@@ -149,30 +168,44 @@ function registerHandlers(bot: Bot, env: Env) {
 
     if (prevState.step === "awaiting_name") {
       await ctx.reply(
-        withState("خوشبختم 🙌 از کدوم شهر هستی و چیکاره‌ای (مثلاً فروشنده موبایل)؟", {
-          step: "awaiting_city",
+        withState("خوشحالم آشنا شدیم 🙌 یه شماره تماس بده که در صورت نیاز بتونیم باهات تماس بگیریم؟", {
+          step: "awaiting_phone",
           name: ctx.message.text,
         }),
-        { parse_mode: "HTML", reply_markup: { force_reply: true } }
+        { reply_markup: { force_reply: true } }
+      );
+      return;
+    }
+
+    if (prevState.step === "awaiting_phone") {
+      await ctx.reply(
+        withState("عالی 👌 حالا بگو از کدوم شهر هستی و چیکاره‌ای (مثلاً فروشنده موبایل)؟", {
+          step: "awaiting_city",
+          name: prevState.name,
+          phone: ctx.message.text,
+        }),
+        { reply_markup: { force_reply: true } }
       );
       return;
     }
 
     if (prevState.step === "awaiting_city") {
       await ctx.reply(
-        withState("عالی، حالا بگو دنبال چه محصولی هستی و با چه تعدادی؟", {
+        withState("خیلی خب، حالا بگو دنبال چه محصولی هستی و با چه تعدادی؟", {
           step: "awaiting_product",
           name: prevState.name,
+          phone: prevState.phone,
           city: ctx.message.text,
         }),
-        { parse_mode: "HTML", reply_markup: { force_reply: true } }
+        { reply_markup: { force_reply: true } }
       );
       return;
     }
 
     if (prevState.step === "awaiting_product") {
       const product = ctx.message.text;
-      const conversationText = `نام: ${prevState.name}\nشهر/شغل: ${prevState.city}\nمحصول موردنظر: ${product}`;
+      const conversationText =
+        `نام: ${prevState.name}\nشماره: ${prevState.phone}\nشهر/شغل: ${prevState.city}\nمحصول موردنظر: ${product}`;
       let summary: string;
       try {
         summary = await summarizeSupportRequest(conversationText, env.GROQ_API_KEY, env.GROQ_TEXT_MODEL);
@@ -184,6 +217,7 @@ function registerHandlers(bot: Bot, env: Env) {
         env.OWNER_CHAT_ID,
         buildOwnerBrief({
           customerName: prevState.name,
+          customerPhone: prevState.phone,
           customerCity: prevState.city,
           customerProduct: product,
           customerTelegramUsername: ctx.from?.username,
@@ -198,7 +232,10 @@ function registerHandlers(bot: Bot, env: Env) {
 
   bot.command("start", async (ctx) => {
     if (ctx.chat.type !== "private") return;
-    await ctx.reply("سلام 👋 خوش اومدی! هر سوالی داری بپرس تا کمکت کنم.");
+    await ctx.reply("اگه فقط دنبال شماره پشتیبانی هستی:", { reply_markup: directContactKeyboard() });
+    await ctx.reply(withState(buildIntro(env.SUPPORT_INTRO), { step: "awaiting_name" }), {
+      reply_markup: { force_reply: true },
+    });
   });
 }
 
