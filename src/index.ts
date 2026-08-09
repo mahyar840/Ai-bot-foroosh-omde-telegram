@@ -3,7 +3,10 @@ import { extractPriceFromCaption, calculateSalePrice, formatToman, DEFAULT_TIERS
 import { checkImageForCompetitorMarks, rewriteCaption, summarizeSupportRequest } from "./vision";
 import { overlayLogo } from "./image";
 import {
-  buildCustomerReplyWithContact,
+  buildAskCity,
+  buildAskPhone,
+  buildAskProduct,
+  buildCustomerFinalReply,
   buildDirectContactMessage,
   buildIntro,
   buildOwnerBrief,
@@ -169,10 +172,7 @@ function registerHandlers(bot: Bot, env: Env) {
 
     if (prevState.step === "awaiting_name") {
       await ctx.reply(
-        withState("خوشحالم آشنا شدیم 🙌 یه شماره تماس بده که در صورت نیاز بتونیم باهات تماس بگیریم؟", {
-          step: "awaiting_phone",
-          name: ctx.message.text,
-        }),
+        withState(buildAskPhone(ctx.message.text), { step: "awaiting_phone", name: ctx.message.text }),
         { parse_mode: "HTML", reply_markup: { force_reply: true } }
       );
       return;
@@ -180,11 +180,7 @@ function registerHandlers(bot: Bot, env: Env) {
 
     if (prevState.step === "awaiting_phone") {
       await ctx.reply(
-        withState("عالی 👌 حالا بگو از کدوم شهر هستی و چیکاره‌ای (مثلاً فروشنده موبایل)؟", {
-          step: "awaiting_city",
-          name: prevState.name,
-          phone: ctx.message.text,
-        }),
+        withState(buildAskCity(), { step: "awaiting_city", name: prevState.name, phone: ctx.message.text }),
         { parse_mode: "HTML", reply_markup: { force_reply: true } }
       );
       return;
@@ -192,7 +188,7 @@ function registerHandlers(bot: Bot, env: Env) {
 
     if (prevState.step === "awaiting_city") {
       await ctx.reply(
-        withState("خیلی خب، حالا بگو دنبال چه محصولی هستی و با چه تعدادی؟", {
+        withState(buildAskProduct(), {
           step: "awaiting_product",
           name: prevState.name,
           phone: prevState.phone,
@@ -227,7 +223,9 @@ function registerHandlers(bot: Bot, env: Env) {
         })
       );
 
-      await ctx.reply(buildCustomerReplyWithContact(env.OWNER_PHONE, env.OWNER_TELEGRAM_USERNAME));
+      await ctx.reply(
+        buildCustomerFinalReply(prevState.name ?? "", product, env.OWNER_PHONE, env.OWNER_TELEGRAM_USERNAME)
+      );
     }
   });
 
