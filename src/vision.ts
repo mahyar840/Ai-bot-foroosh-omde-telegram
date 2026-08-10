@@ -11,7 +11,7 @@
 
 export interface WatermarkCheckResult {
   isClean: boolean;
-  reason: string; // short explanation, useful when you review flagged posts
+  reason: string;
 }
 
 export async function checkImageForCompetitorMarks(
@@ -71,9 +71,6 @@ export async function checkImageForCompetitorMarks(
       reason: parsed.reason ?? "",
     };
   } catch {
-    // If the model didn't return valid JSON, don't reject — bias toward
-    // publishing over false rejections. The owner still sees every post
-    // before it goes live in phase 1, so a rare bad one gets caught there.
     return { isClean: true, reason: "پاسخ هوش‌مصنوعی قابل‌تفسیر نبود، به‌صورت پیش‌فرض تمیز در نظر گرفته شد" };
   }
 }
@@ -98,6 +95,8 @@ export async function rewriteCaption(
     "- هر لینک یا آدرس کانال/گروه/سایت (t.me/..., rubika.ir/..., هر لینک دیگه)\n" +
     "- اسم فروشگاه یا تامین‌کننده و هر جمله‌ی تبلیغاتی درباره خودشون (مثلاً «کانال همکاران ما»، «سفارش از...»)\n\n" +
     "لحن را برای یک کانال فروش حرفه‌ای و جذاب کن ولی مشخصات فنی واقعی محصول را عوض نکن یا اضافه نکن. " +
+    "خیلی مهم: خروجی هرگز نباید خالی یا خیلی کوتاه باشه — حداقل باید اسم محصول و مهم‌ترین ویژگی‌هاش رو نگه داری. " +
+    "اگر بعد از حذف قیمت و اطلاعات تماس، چیز زیادی از متن باقی نمی‌مونه، حداقل عنوان محصول (خط اول یا هرجایی که اسم/مدل محصول اومده) رو بدون تغییر برگردون. " +
     "فقط متن نهایی (بدون قیمت و بدون اطلاعات تماس) را برگردان، بدون هیچ توضیح اضافه‌ای.\n\n" +
     `کپشن اصلی:\n${originalCaption}`;
 
@@ -121,7 +120,13 @@ export async function rewriteCaption(
   }
 
   const data = await res.json<any>();
-  return (data.choices?.[0]?.message?.content ?? originalCaption).trim();
+  const result = (data.choices?.[0]?.message?.content ?? "").trim();
+
+  if (result.length < 10) {
+    throw new Error("AI rewrite returned an empty/too-short description");
+  }
+
+  return result;
 }
 
 /** Summarizes a customer's support request into a short brief for the human owner. */
