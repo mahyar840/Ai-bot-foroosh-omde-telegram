@@ -57,6 +57,13 @@ function registerHandlers(bot: Bot, env: Env) {
     if (String(ctx.chat.id) !== env.MIDDLEMAN_CHAT_ID) return;
 
     const caption = ctx.channelPost.caption ?? "";
+
+    // Telegram sometimes delivers an early/incomplete update for forwarded
+    // photos with no caption yet, followed shortly by the real one. Skip
+    // silently instead of raising a false alarm — the real delivery will
+    // trigger this handler again with the full caption.
+    if (!caption.trim()) return;
+
     const purchasePrice = extractPriceFromCaption(caption);
 
     if (purchasePrice === null) {
